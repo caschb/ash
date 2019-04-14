@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <signal>
 #include <unistd.h>
 #include <errno.h>
 #include <sys/types.h>
@@ -9,6 +8,8 @@
 
 #define MAXLINE 80
 #define SEPARATORS " \n\t"
+
+int should_run;
 
 char * read_input(void){
 	printf("ash>");
@@ -43,6 +44,24 @@ int get_argc(char ** tokens){
 	return argc;
 }
 
+int exec_cd(char ** tokens){
+	return chdir(tokens[1]);
+}
+
+int exec_clear(char ** tokens){
+	printf("\x1b[2J"); //clears the screen
+	printf("\x1b[H"); //moves the cursor to home
+	return 0;
+}
+
+int exec_exit(char ** tokens){
+	should_run = 0;
+}
+
+int built_ins = 3;
+char * built_in_names[] = {"cd", "clear", "exit"};
+int (*built_in[])(char ** tokens) = {exec_cd, exec_clear, exec_exit};
+
 int execute(char ** tokens){
 	int should_wait = 1;
 	int status;
@@ -53,13 +72,15 @@ int execute(char ** tokens){
 	} else {
 		should_wait = 1;
 	}
-	if(strcmp(tokens[0], "cd") == 0){
-		chdir(tokens[1]);
-	} else if(strcmp(tokens[0], "clear") == 0){
-		printf("\x1b[2J"); //clears the screen
-		printf("\x1b[H"); //moves the cursor to home
-	} else if(strcmp(tokens[0], "exit") == 0){
-		//should_run = 0;
+	int built_in_index = -1;
+	for(int i = 0; i < built_ins && built_in_index == -1; ++i){
+		if(strcmp(tokens[0], built_in_names[i]) == 0){
+			built_in_index = i;
+		}
+	}
+
+	if(built_in_index != -1){
+		built_in[built_in_index](tokens);
 	} else if(fork() == 0){
 		execvp(tokens[0], tokens);
 		_exit(0);
@@ -74,8 +95,8 @@ int execute(char ** tokens){
 int main(void){
 	char * user_input;
 	char ** tokens;
-	int should_run = 1;
 	int status;
+	should_run = 1;
 
 	while(should_run){
 		user_input = read_input();	
